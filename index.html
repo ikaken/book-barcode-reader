@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>書籍JANコードリーダー</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -14,78 +16,57 @@
         </header>
 
         <main>
-            <div class="input-section">
-                <label for="barcodeInput">JANコードを入力またはスキャン:</label>
-                <div class="input-controls">
-                    <input 
-                        type="text" 
-                        id="barcodeInput" 
-                        placeholder="例: 9784101001012, 9784101001012-0091" 
-                        autofocus
-                    >
-                    <div class="button-group">
-                        <button id="readBtn" class="read-btn">読み込み</button>
-                        <button id="clearBtn" class="clear-btn">クリア</button>
+            <div class="books-container">
+                <!-- 書籍1 -->
+                <section id="book1" class="book-widget">
+                    <h2>書籍 1</h2>
+                    <div class="input-section">
+                        <label>JANコードを入力またはスキャン（上段: ISBN / 下段: Cコード）:</label>
+                        <div class="input-controls">
+                            <input type="text" class="barcode-input isbn-input" placeholder="ISBN (978...)">
+                            <input type="text" class="barcode-input ccode-input" placeholder="Cコード (192...)">
+                            <div class="button-group">
+                                <button class="read-btn">読み込み</button>
+                                <button class="clear-btn">クリア</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div id="result" class="result hidden">
-                <div class="result-header">
-                    <h2>📖 書籍情報</h2>
-                </div>
-                <div class="result-content">
-                    <div class="info-row">
-                        <span class="label">ISBN:</span>
-                        <span id="isbnDisplay" class="value"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">書籍名:</span>
-                        <span id="titleDisplay" class="value"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">Cコード:</span>
-                        <span id="cCodeDisplay" class="value"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">販売対象:</span>
-                        <span id="targetDisplay" class="value"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">発行形態:</span>
-                        <span id="formatDisplay" class="value"></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="label">内容分類:</span>
-                        <span id="contentDisplay" class="value"></span>
-                    </div>
-                </div>
-            </div>
-
-            <div id="error" class="error hidden"></div>
-
-            <div class="info-section">
-                <h3>💡 使い方</h3>
-                <ul>
-                    <li>バーコードリーダーで書籍のJANコード（ISBN）を読み取ってください</li>
-                    <li>入力欄にフォーカスがある状態でスキャンすると自動的に書籍情報が表示されます</li>
-                    <li>手動入力も可能です（JANコードまたはCコード）</li>
-                    <li>Enterキーまたは自動的に分類情報が表示されます</li>
-                </ul>
-                <p><strong>対応形式:</strong> 9784101001012, 9784101001012-0091, 9784101001012C0091, 0091 など</p>
-                <p><strong>機能:</strong> ISBNから書籍名を自動取得し、Cコードで分類を表示</p>
-            </div>
-
-            <div class="info-section">
-                <h3>📋 Cコードについて</h3>
-                <p>Cコードは書籍の分類コードで、4桁の数字で構成されています：</p>
-                <ul>
-                    <li><strong>1桁目:</strong> 販売対象（一般、教養、専門など）</li>
-                    <li><strong>2桁目:</strong> 発行形態（単行本、文庫、新書など）</li>
-                    <li><strong>3-4桁目:</strong> 内容分類（文学、歴史、科学など）</li>
-                </ul>
-                <p>日本の書籍には通常、ISBNバーコードとは別にCコードのバーコードが印刷されています。</p>
-            </div>
+                    <div class="result hidden">
+                        <div class="result-header">
+                            <h3>📖 書籍情報</h3>
+                        </div>
+                        <div class="result-content">
+                            <div class="info-row">
+                                <span class="label">ISBN:</span>
+                                <span class="value isbn-display"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">書籍名:</span>
+                                <span class="value title-display"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Cコード:</span>
+                                <span class="value ccode-display"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">販売対象:</span>
+                                <span class="value target-display"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">発行形態:</span>
+                                <span class="value format-display"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">内容分類:</span>
+                                <span class="value content-display"></span>
+                            </div>
+                            <li>入力欄にフォーカスがある状態でスキャンすると自動的に書籍情報が表示されます</li>
+                            <li>手動入力も可能です（JANコードまたはCコード）</li>
+                            <li><strong>全角数字の入力にも対応しています</strong></li>
+                            </ul>
+                            <p><strong>対応形式:</strong> 9784101001012, 1920093005804 など</p>
+                        </div>
         </main>
 
         <footer>
@@ -93,7 +74,7 @@
         </footer>
     </div>
 
-    <script src="ccode-data.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
+
 </html>

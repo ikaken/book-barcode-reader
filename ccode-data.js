@@ -1,5 +1,6 @@
 // Cコード分類データ
-const CCODE_DATA = {
+// Cコード分類データ
+export const CCODE_DATA = {
     // 1桁目: 販売対象
     target: {
         '0': '一般',
@@ -133,7 +134,7 @@ const CCODE_DATA = {
 };
 
 // Cコードを解析する関数
-function parseCCode(ccode) {
+export function parseCCode(ccode) {
     if (!ccode || ccode.length !== 4) {
         return null;
     }

@@ -13,12 +13,35 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     background: white;
     border-radius: 20px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     overflow: hidden;
+}
+
+.books-container {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.book-widget {
+    flex: 1;
+    min-width: 300px;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 15px;
+    border: 1px solid #eee;
+}
+
+.book-widget h2 {
+    margin-bottom: 20px;
+    color: #4a5568;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 10px;
 }
 
 header {
@@ -68,7 +91,7 @@ main {
     color: #333;
 }
 
-#barcodeInput {
+.barcode-input {
     padding: 15px 20px;
     font-size: 1.2rem;
     border: 2px solid #ddd;
@@ -78,7 +101,7 @@ main {
     letter-spacing: 1px;
 }
 
-#barcodeInput:focus {
+.barcode-input:focus {
     outline: none;
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -133,6 +156,7 @@ main {
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -185,9 +209,19 @@ main {
 }
 
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-10px);
+    }
+
+    75% {
+        transform: translateX(10px);
+    }
 }
 
 .hidden {
@@ -234,21 +268,21 @@ footer {
     header h1 {
         font-size: 2rem;
     }
-    
+
     .subtitle {
         font-size: 1rem;
     }
-    
+
     main {
         padding: 30px 20px;
     }
-    
+
     .info-row {
         flex-direction: column;
         align-items: flex-start;
         gap: 5px;
     }
-    
+
     .info-row .value {
         text-align: left;
     }
