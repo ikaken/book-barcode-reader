@@ -1,5 +1,91 @@
 import { parseCCode } from './ccode-data.js';
 
+class GoogleBooksService {
+    static async fetchByISBN(isbn) {
+        try {
+            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+
+            if (!response.ok) {
+                throw new Error('書籍情報の取得に失敗しました');
+            }
+
+            const data = await response.json();
+            if (!data || data.totalItems === 0 || !Array.isArray(data.items) || !data.items[0]) {
+                return null;
+            }
+
+            const v = data.items[0].volumeInfo || {};
+
+            // 巻数はGoogle Booksで一貫して返ってくるフィールドがないため、あれば拾う（なければ不明扱い）
+            const volume = (v.seriesInfo && v.seriesInfo.bookDisplayNumber) || v.volumeNumber || null;
+
+            return {
+                title: v.title || null,
+                subtitle: v.subtitle || null,
+                volume: volume ? String(volume) : null,
+                publisher: v.publisher || null,
+                authors: Array.isArray(v.authors) ? v.authors.join(', ') : null
+            };
+
+        } catch (error) {
+            console.error('Google Books APIエラー:', error);
+            return null;
+        }
+    }
+}
+
+class NdlSearchService {
+    static _getFirstText(xml, localName) {
+        const el = xml.getElementsByTagNameNS('*', localName)[0];
+        return el ? (el.textContent || '').trim() : null;
+    }
+
+    static _getAllTexts(xml, localName) {
+        const els = Array.from(xml.getElementsByTagNameNS('*', localName));
+        const values = els
+            .map((e) => (e.textContent || '').trim())
+            .filter(Boolean);
+        return values.length ? values : null;
+    }
+
+    static async fetchByISBN(isbn) {
+        try {
+            const url = `https://iss.ndl.go.jp/api/sru?operation=searchRetrieve&query=isbn=${encodeURIComponent(isbn)}&recordSchema=dcndl_simple&maximumRecords=1`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error('書籍情報の取得に失敗しました');
+            }
+
+            const xmlText = await response.text();
+            const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+
+            const title = this._getFirstText(xml, 'title');
+            const subtitle = this._getFirstText(xml, 'alternative');
+            const volume = this._getFirstText(xml, 'volume');
+            const creators = this._getAllTexts(xml, 'creator');
+            const publisher = this._getFirstText(xml, 'publisher');
+            const ndc = this._getFirstText(xml, 'NDC9') || this._getFirstText(xml, 'NDC10') || this._getFirstText(xml, 'NDC');
+
+            if (!title && !subtitle && !volume && !creators && !ndc) {
+                return null;
+            }
+
+            return {
+                title: title || null,
+                subtitle: subtitle || null,
+                volume: volume || null,
+                authors: creators ? creators.join(', ') : null,
+                publisher: publisher || null,
+                ndc: ndc || null
+            };
+
+        } catch (error) {
+            console.error('NDLサーチ取得エラー:', error);
+            return null;
+        }
+    }
+}
 /**
  * バーコード文字列の解析を行うクラス
  */
@@ -102,7 +188,7 @@ class BookService {
      */
     static async fetchByISBN(isbn) {
         try {
-            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+            const response = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
 
             if (!response.ok) {
                 throw new Error('書籍情報の取得に失敗しました');
@@ -110,16 +196,46 @@ class BookService {
 
             const data = await response.json();
 
-            if (data.totalItems === 0) {
+            if (!Array.isArray(data) || !data[0]) {
                 return null;
             }
 
-            const book = data.items[0].volumeInfo;
+            const entry = data[0];
+            const summary = entry.summary || {};
+            const onix = entry.onix || {};
+
+            const publisher = summary.publisher
+                || (onix.PublishingDetail
+                    && onix.PublishingDetail.Imprint
+                    && onix.PublishingDetail.Imprint.ImprintName
+                    && onix.PublishingDetail.Imprint.ImprintName.content)
+                || (onix.PublishingDetail
+                    && onix.PublishingDetail.Publisher
+                    && onix.PublishingDetail.Publisher.PublisherName
+                    && onix.PublishingDetail.Publisher.PublisherName.content)
+                || null;
+
+            let ndc = summary.ndc || summary.ndc9 || summary.ndc10 || null;
+            if (Array.isArray(ndc)) {
+                ndc = ndc.filter(Boolean).join(', ');
+            }
+
+            if (!ndc && onix.DescriptiveDetail && Array.isArray(onix.DescriptiveDetail.Subject)) {
+                for (const subj of onix.DescriptiveDetail.Subject) {
+                    if (subj && (subj.SubjectSchemeIdentifier === 'NDC9' || subj.SubjectSchemeIdentifier === 'NDC10')) {
+                        ndc = subj.SubjectCode || null;
+                        break;
+                    }
+                }
+            }
+
             return {
-                title: book.title || '不明',
-                authors: book.authors ? book.authors.join(', ') : '不明',
-                publisher: book.publisher || '不明',
-                publishedDate: book.publishedDate || '不明'
+                title: summary.title || null,
+                subtitle: summary.subtitle || null,
+                volume: summary.volume || null,
+                publisher,
+                authors: summary.author || null,
+                ndc: ndc || null
             };
 
         } catch (error) {
@@ -152,7 +268,23 @@ class BookReaderWidget {
             resultDiv: this.root.querySelector('.result'),
             errorDiv: this.root.querySelector('.error'),
             isbnDisplay: this.root.querySelector('.isbn-display'),
-            titleDisplay: this.root.querySelector('.title-display'),
+            googleTitle: this.root.querySelector('.google-title'),
+            googleSubtitle: this.root.querySelector('.google-subtitle'),
+            googleVolume: this.root.querySelector('.google-volume'),
+            googlePublisher: this.root.querySelector('.google-publisher'),
+            googleAuthors: this.root.querySelector('.google-authors'),
+            openbdTitle: this.root.querySelector('.openbd-title'),
+            openbdSubtitle: this.root.querySelector('.openbd-subtitle'),
+            openbdVolume: this.root.querySelector('.openbd-volume'),
+            openbdPublisher: this.root.querySelector('.openbd-publisher'),
+            openbdAuthors: this.root.querySelector('.openbd-authors'),
+            openbdNdc: this.root.querySelector('.openbd-ndc'),
+            ndlTitle: this.root.querySelector('.ndl-title'),
+            ndlSubtitle: this.root.querySelector('.ndl-subtitle'),
+            ndlVolume: this.root.querySelector('.ndl-volume'),
+            ndlPublisher: this.root.querySelector('.ndl-publisher'),
+            ndlAuthors: this.root.querySelector('.ndl-authors'),
+            ndlNdc: this.root.querySelector('.ndl-ndc'),
             cCodeDisplay: this.root.querySelector('.ccode-display'),
             targetDisplay: this.root.querySelector('.target-display'),
             formatDisplay: this.root.querySelector('.format-display'),
@@ -251,20 +383,24 @@ class BookReaderWidget {
                 ccode = BarcodeParser.extractCCode(normalizedIsbn);
             }
 
-            if (!ccode) {
-                throw new Error('Cコードを検出できませんでした。');
+            let parsedCCode = null;
+            if (ccode) {
+                parsedCCode = parseCCode(ccode);
+                if (!parsedCCode) {
+                    throw new Error('Cコードの解析に失敗しました');
+                }
             }
 
-            // Cコード解析
-            const parsedCCode = parseCCode(ccode);
-            if (!parsedCCode) {
-                throw new Error('Cコードの解析に失敗しました');
-            }
-
-            // 書籍情報の取得
-            let bookInfo = null;
+            // 書籍情報の取得（取得元ごと）
+            let googleInfo = null;
+            let openbdInfo = null;
+            let ndlInfo = null;
             if (isbn) {
-                bookInfo = await BookService.fetchByISBN(isbn);
+                [googleInfo, openbdInfo, ndlInfo] = await Promise.all([
+                    GoogleBooksService.fetchByISBN(isbn),
+                    BookService.fetchByISBN(isbn),
+                    NdlSearchService.fetchByISBN(isbn)
+                ]);
             }
 
             // 結果表示
@@ -272,7 +408,9 @@ class BookReaderWidget {
                 isbn,
                 ccode,
                 parsedCCode,
-                bookInfo
+                googleInfo,
+                openbdInfo,
+                ndlInfo
             });
 
             // 成功時、次のウィジェットのISBN欄へフォーカス移動
@@ -295,14 +433,45 @@ class BookReaderWidget {
     }
 
     showResult(data) {
-        const { isbn, ccode, parsedCCode, bookInfo } = data;
+        const { isbn, ccode, parsedCCode, googleInfo, openbdInfo, ndlInfo } = data;
+
+        const safe = (v, fallback = '-') => (v && String(v).trim() ? String(v) : fallback);
 
         this.elements.isbnDisplay.textContent = isbn || '不明';
-        this.elements.titleDisplay.textContent = bookInfo ? bookInfo.title : (isbn ? '取得できませんでした' : '-');
-        this.elements.cCodeDisplay.textContent = ccode;
-        this.elements.targetDisplay.textContent = parsedCCode.target;
-        this.elements.formatDisplay.textContent = parsedCCode.format;
-        this.elements.contentDisplay.textContent = parsedCCode.content;
+
+        // Google Books
+        if (this.elements.googleTitle) this.elements.googleTitle.textContent = safe(googleInfo && googleInfo.title, isbn ? '取得できませんでした' : '-');
+        if (this.elements.googleSubtitle) this.elements.googleSubtitle.textContent = safe(googleInfo && googleInfo.subtitle);
+        if (this.elements.googleVolume) this.elements.googleVolume.textContent = safe(googleInfo && googleInfo.volume);
+        if (this.elements.googlePublisher) this.elements.googlePublisher.textContent = safe(googleInfo && googleInfo.publisher);
+        if (this.elements.googleAuthors) this.elements.googleAuthors.textContent = safe(googleInfo && googleInfo.authors);
+
+        // OpenBD
+        if (this.elements.openbdTitle) this.elements.openbdTitle.textContent = safe(openbdInfo && openbdInfo.title, isbn ? '取得できませんでした' : '-');
+        if (this.elements.openbdSubtitle) this.elements.openbdSubtitle.textContent = safe(openbdInfo && openbdInfo.subtitle);
+        if (this.elements.openbdVolume) this.elements.openbdVolume.textContent = safe(openbdInfo && openbdInfo.volume);
+        if (this.elements.openbdPublisher) this.elements.openbdPublisher.textContent = safe(openbdInfo && openbdInfo.publisher);
+        if (this.elements.openbdAuthors) this.elements.openbdAuthors.textContent = safe(openbdInfo && openbdInfo.authors);
+        if (this.elements.openbdNdc) this.elements.openbdNdc.textContent = safe(openbdInfo && openbdInfo.ndc, isbn ? '不明' : '-');
+
+        // NDLサーチ
+        if (this.elements.ndlTitle) this.elements.ndlTitle.textContent = safe(ndlInfo && ndlInfo.title, isbn ? '取得できませんでした' : '-');
+        if (this.elements.ndlSubtitle) this.elements.ndlSubtitle.textContent = safe(ndlInfo && ndlInfo.subtitle);
+        if (this.elements.ndlVolume) this.elements.ndlVolume.textContent = safe(ndlInfo && ndlInfo.volume);
+        if (this.elements.ndlPublisher) this.elements.ndlPublisher.textContent = safe(ndlInfo && ndlInfo.publisher);
+        if (this.elements.ndlAuthors) this.elements.ndlAuthors.textContent = safe(ndlInfo && ndlInfo.authors);
+        if (this.elements.ndlNdc) this.elements.ndlNdc.textContent = safe(ndlInfo && ndlInfo.ndc, isbn ? '不明' : '-');
+
+        this.elements.cCodeDisplay.textContent = ccode || '-';
+        if (parsedCCode) {
+            this.elements.targetDisplay.textContent = parsedCCode.target;
+            this.elements.formatDisplay.textContent = parsedCCode.format;
+            this.elements.contentDisplay.textContent = parsedCCode.content;
+        } else {
+            this.elements.targetDisplay.textContent = '-';
+            this.elements.formatDisplay.textContent = '-';
+            this.elements.contentDisplay.textContent = '-';
+        }
 
         this.elements.resultDiv.classList.remove('hidden');
         this.elements.errorDiv.classList.add('hidden');

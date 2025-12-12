@@ -175,6 +175,18 @@ main {
     gap: 15px;
 }
 
+.source-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.source-section h4 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 1.05rem;
+}
+
 .info-row {
     display: flex;
     justify-content: space-between;
